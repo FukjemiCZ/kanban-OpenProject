@@ -1,10 +1,8 @@
 "use client";
 
 import { Box, Typography } from "@mui/material";
-
 import { BoardSettingsDrawer } from "../BoardSettingsDrawer";
 import { WorkPackageDetailDrawer } from "../WorkPackageDetailDrawer";
-
 import { KanbanGrid } from "./KanbanGrid";
 import { KanbanTopBar } from "./KanbanTopBar";
 import {
@@ -29,11 +27,7 @@ export function KanbanBoard({
   const state = useKanbanBoardState(initialItems);
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Přihlášen: {initialMe?.name ?? "?"}
-      </Typography>
-
+    <>
       <KanbanTopBar
         q={state.filters.q}
         onQChange={state.setQuickSearch}
@@ -44,48 +38,57 @@ export function KanbanBoard({
         filteredCount={state.filteredItems.length}
         getFieldLabel={getFieldLabel}
         onOpenSettings={() => state.setBoardSettingsOpen(true)}
-        onCopyShareLink={state.copyShareLink}
+        onCopyShareLink={() => {
+          void state.copyShareLink();
+        }}
       />
 
-      {!state.hasCards ? (
-        <Box
-          sx={{
-            p: 3,
-            border: "1px dashed",
-            borderColor: "divider",
-            borderRadius: 2,
-            bgcolor: "background.paper",
-          }}
-        >
-          <Typography variant="subtitle1" fontWeight={700}>
-            Žádné tasky neodpovídají pohledu
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Zkus upravit vyhledávání nebo otevři nastavení boardu a změň filtry.
-          </Typography>
-        </Box>
-      ) : (
-        <KanbanGrid
-          rows={state.rows}
-          visibleColumns={state.visibleColumns}
-          rowGroupBy={state.rowGroupBy}
-          nestedRowGroupBy={state.nestedRowGroupBy}
-          nestedEnabled={state.nestedEnabled}
-          primaryLaneCounts={state.primaryLaneCounts}
-          getFieldLabel={getFieldLabel}
-          getColumnLabel={getColumnLabel}
-          countInColumn={state.countInColumn}
-          onOpenCard={state.setSelectedId}
-          visibleCardFields={state.visibleCardFields}
-        />
-      )}
+      <Box sx={{ px: { xs: 1, md: 2 }, pb: 2 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Přihlášen: {initialMe?.name ?? "?"}
+        </Typography>
+
+        {!state.hasCards ? (
+          <Box
+            sx={{
+              border: "1px dashed",
+              borderColor: "divider",
+              borderRadius: 2,
+              p: 3,
+              textAlign: "center",
+            }}
+          >
+            <Typography fontWeight={700}>Žádné tasky neodpovídají pohledu</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Zkus upravit vyhledávání nebo otevři nastavení boardu a změň filtry.
+            </Typography>
+          </Box>
+        ) : (
+          <KanbanGrid
+            rows={state.rows}
+            visibleColumns={state.visibleColumns}
+            rowGroupBy={state.rowGroupBy}
+            nestedRowGroupBy={state.nestedRowGroupBy}
+            nestedEnabled={state.nestedEnabled}
+            primaryLaneCounts={state.primaryLaneCounts}
+            getFieldLabel={getFieldLabel}
+            getColumnLabel={getColumnLabel}
+            countInColumn={state.countInColumn}
+            onOpenCard={state.setSelectedId}
+            visibleCardFields={state.visibleCardFields}
+            onCardDrop={state.onDropCard}
+          />
+        )}
+      </Box>
 
       <BoardSettingsDrawer
         open={state.boardSettingsOpen}
         onClose={() => state.setBoardSettingsOpen(false)}
         hiddenByColumnSelectionCount={0}
         filteredCount={state.filteredItems.length}
-        onCopyShareLink={state.copyShareLink}
+        onCopyShareLink={() => {
+          void state.copyShareLink();
+        }}
         onClearAll={state.clearAll}
         rowGroupBy={state.rowGroupBy}
         nestedRowGroupBy={state.nestedRowGroupBy}
@@ -111,10 +114,10 @@ export function KanbanBoard({
       />
 
       <WorkPackageDetailDrawer
-        open={state.selectedId !== null}
         workPackageId={state.selectedId}
+        open={state.selectedId != null}
         onClose={() => state.setSelectedId(null)}
       />
-    </Box>
+    </>
   );
 }

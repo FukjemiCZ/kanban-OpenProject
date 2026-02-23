@@ -1,9 +1,9 @@
 import {
   BOARD_COLUMNS,
   DEFAULT_COLUMN_KEYS,
+  GROUP_OPTIONS,
   OPTIONAL_CARD_FIELDS,
   OPTIONAL_COLUMN_KEYS,
-  GROUP_OPTIONS,
 } from "./kanban.constants";
 import type {
   BoardColumnKey,
@@ -32,8 +32,29 @@ export function getGroupValue(item: WorkPackage, field: GroupField): string {
   return normalizeValue(item[field]);
 }
 
+export function getGroupApiValue(item: WorkPackage, field: GroupField): string | null | undefined {
+  switch (field) {
+    case "none":
+      return undefined;
+    case "assigneeName":
+      return item.assigneeHref ?? null;
+    case "priorityName":
+      return item.priorityHref;
+    case "typeName":
+      return item.typeHref;
+    case "responsibleName":
+      return item.responsibleHref ?? null;
+    case "projectName":
+      return item.projectHref;
+    case "authorName":
+      return item.authorHref;
+    default:
+      return undefined;
+  }
+}
+
 export function buildDistinctValues(items: WorkPackage[]) {
-  const out: Record<string, string[]> = {
+  const out: Record<Exclude<GroupField, "none"> | "statusName", string[]> = {
     statusName: [],
     priorityName: [],
     assigneeName: [],
@@ -43,14 +64,14 @@ export function buildDistinctValues(items: WorkPackage[]) {
     responsibleName: [],
   };
 
-  const sets: Record<string, Set<string>> = {
-    statusName: new Set<string>(),
-    priorityName: new Set<string>(),
-    assigneeName: new Set<string>(),
-    projectName: new Set<string>(),
-    typeName: new Set<string>(),
-    authorName: new Set<string>(),
-    responsibleName: new Set<string>(),
+  const sets: Record<Exclude<GroupField, "none"> | "statusName", Set<string>> = {
+    statusName: new Set(),
+    priorityName: new Set(),
+    assigneeName: new Set(),
+    projectName: new Set(),
+    typeName: new Set(),
+    authorName: new Set(),
+    responsibleName: new Set(),
   };
 
   for (const item of items) {
@@ -63,11 +84,11 @@ export function buildDistinctValues(items: WorkPackage[]) {
     sets.responsibleName.add(normalizeValue(item.responsibleName));
   }
 
-  for (const key of Object.keys(sets)) {
+  for (const key of Object.keys(sets) as Array<keyof typeof sets>) {
     out[key] = sortGroupKeys(Array.from(sets[key]));
   }
 
-  return out as Record<keyof Omit<FiltersState, "q">, string[]>;
+  return out;
 }
 
 function matchesMulti(values: string[], candidate?: string) {
@@ -150,7 +171,7 @@ export function parseColsParam(sp: URLSearchParams): BoardColumnKey[] {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const allowed = new Set<BoardColumnKey>(OPTIONAL_COLUMN_KEYS);
+  const allowed = new Set(OPTIONAL_COLUMN_KEYS);
   return Array.from(new Set(raw)).filter((v): v is BoardColumnKey =>
     allowed.has(v as BoardColumnKey)
   );
@@ -162,7 +183,7 @@ export function parseFieldsParam(sp: URLSearchParams): CardFieldKey[] {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const allowed = new Set<CardFieldKey>(OPTIONAL_CARD_FIELDS.map((f) => f.key));
+  const allowed = new Set(OPTIONAL_CARD_FIELDS.map((f) => f.key));
   return Array.from(new Set(raw)).filter((v): v is CardFieldKey =>
     allowed.has(v as CardFieldKey)
   );
@@ -194,12 +215,14 @@ function dedupeColumns(cols: BoardColumnKey[]) {
   return cols.filter((c, i) => cols.indexOf(c) === i);
 }
 
-// no default hiding; auto-add columns detected in filtered items
 export function buildEffectiveVisibleColumns(
   userExtraColumns: BoardColumnKey[],
   filteredItems: WorkPackage[]
 ): BoardColumnKey[] {
-  const detected = filteredItems.map((i) => mapStatusToColumnKey(i.statusName));
+  const detected = filteredItems
+    .map((i) => mapStatusToColumnKey(i.statusName))
+    .filter((c) => c !== "other");
+
   return dedupeColumns([
     ...DEFAULT_COLUMN_KEYS,
     ...detected,
@@ -219,12 +242,10 @@ export function buildRows(params: {
   nestedRowGroupBy: GroupField;
 }): LaneRow[] {
   const { items, visibleColumns, rowGroupBy, nestedRowGroupBy } = params;
-
   const rows: LaneRow[] = [];
+
   const nestedEnabled =
-    rowGroupBy !== "none" &&
-    nestedRowGroupBy !== "none" &&
-    rowGroupBy !== nestedRowGroupBy;
+    rowGroupBy !== "none" && nestedRowGroupBy !== "none" && rowGroupBy !== nestedRowGroupBy;
 
   const pushItemsToCells = (targetItems: WorkPackage[]) => {
     const cellsByColumn = createEmptyCellsByColumn(visibleColumns);
@@ -245,6 +266,7 @@ export function buildRows(params: {
     rows.push({
       laneKey: "all",
       laneLabel: "Vše",
+      laneApiValue: undefined,
       cellsByColumn: packed.cellsByColumn,
       total: packed.total,
     });
@@ -252,6 +274,7 @@ export function buildRows(params: {
   }
 
   const primaryMap = new Map<string, WorkPackage[]>();
+
   for (const item of items) {
     const key = getGroupValue(item, rowGroupBy);
     if (!primaryMap.has(key)) primaryMap.set(key, []);
@@ -262,12 +285,14 @@ export function buildRows(params: {
 
   for (const pk of primaryKeys) {
     const primaryItems = primaryMap.get(pk) ?? [];
+    const laneApiValue = primaryItems[0] ? getGroupApiValue(primaryItems[0], rowGroupBy) : undefined;
 
     if (!nestedEnabled) {
       const packed = pushItemsToCells(primaryItems);
       rows.push({
         laneKey: pk,
         laneLabel: pk,
+        laneApiValue,
         cellsByColumn: packed.cellsByColumn,
         total: packed.total,
       });
@@ -275,6 +300,7 @@ export function buildRows(params: {
     }
 
     const secondaryMap = new Map<string, WorkPackage[]>();
+
     for (const item of primaryItems) {
       const sk = getGroupValue(item, nestedRowGroupBy);
       if (!secondaryMap.has(sk)) secondaryMap.set(sk, []);
@@ -284,12 +310,19 @@ export function buildRows(params: {
     const secondaryKeys = sortGroupKeys(Array.from(secondaryMap.keys()));
 
     for (const sk of secondaryKeys) {
-      const packed = pushItemsToCells(secondaryMap.get(sk) ?? []);
+      const secondaryItems = secondaryMap.get(sk) ?? [];
+      const nestedApiValue = secondaryItems[0]
+        ? getGroupApiValue(secondaryItems[0], nestedRowGroupBy)
+        : undefined;
+
+      const packed = pushItemsToCells(secondaryItems);
       rows.push({
         laneKey: pk,
         laneLabel: pk,
+        laneApiValue,
         nestedKey: sk,
         nestedLabel: sk,
+        nestedApiValue,
         cellsByColumn: packed.cellsByColumn,
         total: packed.total,
       });
@@ -317,3 +350,88 @@ export const EMPTY_FILTERS: FiltersState = {
   authorName: [],
   responsibleName: [],
 };
+
+export function canEditSwimlineField(field: GroupField) {
+  return (
+    field === "assigneeName" ||
+    field === "priorityName" ||
+    field === "typeName" ||
+    field === "responsibleName"
+  );
+}
+
+export type BoardUpdatePatch = {
+  statusColumnKey?: BoardColumnKey;
+  swimline?: {
+    field: GroupField;
+    apiValue: string | null | undefined;
+    label: string;
+  };
+  nestedSwimline?: {
+    field: Exclude<GroupField, "none">;
+    apiValue: string | null | undefined;
+    label: string;
+  };
+};
+
+export function buildPatchFromBoardDrop(params: {
+  card: WorkPackage;
+  fromColumnKey: BoardColumnKey;
+  toColumnKey: BoardColumnKey;
+  fromLaneKey: string;
+  toLaneKey: string;
+  fromNestedKey?: string;
+  toNestedKey?: string;
+  rowGroupBy: GroupField;
+  nestedRowGroupBy: GroupField;
+  toLaneApiValue?: string | null;
+  toNestedApiValue?: string | null;
+  toLaneLabel: string;
+  toNestedLabel?: string;
+}): BoardUpdatePatch {
+  const {
+    fromColumnKey,
+    toColumnKey,
+    fromLaneKey,
+    toLaneKey,
+    fromNestedKey,
+    toNestedKey,
+    rowGroupBy,
+    nestedRowGroupBy,
+    toLaneApiValue,
+    toNestedApiValue,
+    toLaneLabel,
+    toNestedLabel,
+  } = params;
+
+  const patch: BoardUpdatePatch = {};
+
+  if (fromColumnKey !== toColumnKey) {
+    patch.statusColumnKey = toColumnKey;
+  }
+
+  if (rowGroupBy !== "none" && fromLaneKey !== toLaneKey && canEditSwimlineField(rowGroupBy)) {
+    patch.swimline = {
+      field: rowGroupBy,
+      apiValue: toLaneApiValue,
+      label: toLaneLabel,
+    };
+  }
+
+  const nestedEnabled =
+    rowGroupBy !== "none" && nestedRowGroupBy !== "none" && rowGroupBy !== nestedRowGroupBy;
+
+  if (
+    nestedEnabled &&
+    fromNestedKey !== toNestedKey &&
+    canEditSwimlineField(nestedRowGroupBy)
+  ) {
+    patch.nestedSwimline = {
+      field: nestedRowGroupBy,
+      apiValue: toNestedApiValue,
+      label: toNestedLabel ?? "—",
+    };
+  }
+
+  return patch;
+}

@@ -45,13 +45,13 @@ export const BOARD_COLUMNS: BoardColumnDef[] = [
   {
     key: "blocker",
     label: "Blocker",
-    aliases: ["blocker", "blocked", "on hold", "hold", "blokovano", "blokováno"],
+    aliases: ["blocker", "blocked", "on hold", "hold", "blokovano","pozastaven", "blokováno"],
     isDefault: true,
   },
   {
     key: "done",
     label: "Done",
-    aliases: ["done", "closed", "resolved", "complete", "completed", "hotovo"],
+    aliases: ["done", "closed", "resolved", "complete", "completed", "Uzavřený", "uzavřen", "hotovo"],
     isDefault: true,
   },
   {

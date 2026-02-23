@@ -10,13 +10,30 @@ export type GroupField =
 export type WorkPackage = {
   id: number;
   subject: string;
+
+  lockVersion?: number;
+
   statusName: string;
+  statusHref?: string;
+
   priorityName?: string;
+  priorityHref?: string;
+
   assigneeName?: string;
+  assigneeHref?: string | null;
+
   projectName?: string;
+  projectIdentifier?: string;
+  projectHref?: string;
+
   typeName?: string;
+  typeHref?: string;
+
   authorName?: string;
+  authorHref?: string;
+
   responsibleName?: string;
+  responsibleHref?: string | null;
 };
 
 export type Me = { name: string };
@@ -53,8 +70,12 @@ export type BoardColumnKey =
 export type LaneRow = {
   laneKey: string;
   laneLabel: string;
+  laneApiValue?: string | null;
+
   nestedKey?: string;
   nestedLabel?: string;
+  nestedApiValue?: string | null;
+
   cellsByColumn: Record<BoardColumnKey, WorkPackage[]>;
   total: number;
 };
@@ -64,4 +85,21 @@ export type BoardColumnDef = {
   label: string;
   aliases: string[];
   isDefault: boolean;
+};
+
+export type BoardDropTarget = {
+  columnKey: BoardColumnKey;
+  laneKey: string;
+  laneLabel: string;
+  laneApiValue?: string | null;
+  nestedKey?: string;
+  nestedLabel?: string;
+  nestedApiValue?: string | null;
+};
+
+export type DragCardPayload = {
+  cardId: number;
+  fromColumnKey: BoardColumnKey;
+  fromLaneKey: string;
+  fromNestedKey?: string;
 };
