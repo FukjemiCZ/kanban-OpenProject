@@ -35,7 +35,7 @@ export function useKanbanBoardState(initialItems: WorkPackage[]) {
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [boardSettingsOpen, setBoardSettingsOpen] = useState(false);
 
-    const [rowGroupBy, setRowGroupBy] = useState<GroupField>("typeName");
+    const [rowGroupBy, setRowGroupBy] = useState<GroupField>("assigneeName");
     const [nestedRowGroupBy, setNestedRowGroupBy] = useState<GroupField>("none");
 
     const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS);
@@ -49,10 +49,10 @@ export function useKanbanBoardState(initialItems: WorkPackage[]) {
         const rowsParam = searchParams.get("rows");
         const safeRows =
             rowsParam === null
-                ? "typeName"
+                ? "assigneeName"
                 : validGroupValues.has(parsed.rows)
                     ? parsed.rows
-                    : "typeName";
+                    : "assigneeName";
         const safeNested = validGroupValues.has(parsed.nested) ? parsed.nested : "none";
 
         setRowGroupBy(safeRows);
@@ -121,7 +121,7 @@ export function useKanbanBoardState(initialItems: WorkPackage[]) {
 
             const params = new URLSearchParams();
 
-            if (rg !== "typeName") params.set("rows", rg);
+            if (rg !== "assigneeName") params.set("rows", rg);
             if (ng !== "none" && ng !== rg) params.set("nested", ng);
 
             // q intentionally NOT in URL
@@ -164,13 +164,13 @@ export function useKanbanBoardState(initialItems: WorkPackage[]) {
 
     const clearAll = useCallback(() => {
         setFilters(EMPTY_FILTERS);
-        setRowGroupBy("typeName");
+        setRowGroupBy("assigneeName");
         setNestedRowGroupBy("none");
         setExtraColumns([]);
         setExtraCardFields([]);
 
         replaceUrl({
-            rowGroupBy: "typeName",
+            rowGroupBy: "assigneeName",
             nestedRowGroupBy: "none",
             filters: EMPTY_FILTERS,
             extraColumns: [],
