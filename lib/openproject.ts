@@ -5,10 +5,21 @@ function url(path: string) {
   return `${env.openProjectBaseUrl}${path}`;
 }
 
-export function getAuthorizeUrl(params: {
-  state: string;
-  codeChallenge: string;
-}) {
+export class OpenProjectUnauthenticatedError extends Error {
+  status = 401 as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "OpenProjectUnauthenticatedError";
+  }
+}
+
+export function isOpenProjectUnauthenticatedError(
+  e: unknown
+): e is OpenProjectUnauthenticatedError {
+  return e instanceof OpenProjectUnauthenticatedError;
+}
+
+export function getAuthorizeUrl(params: { state: string; codeChallenge: string }) {
   const u = new URL(url("/oauth/authorize"));
   u.searchParams.set("response_type", "code");
   u.searchParams.set("client_id", env.clientId);
@@ -19,10 +30,7 @@ export function getAuthorizeUrl(params: {
   return u.toString();
 }
 
-export async function exchangeCodeForToken(input: {
-  code: string;
-  codeVerifier: string;
-}) {
+export async function exchangeCodeForToken(input: { code: string; codeVerifier: string }) {
   const body = new URLSearchParams();
   body.set("grant_type", "authorization_code");
   body.set("code", input.code);
@@ -39,7 +47,7 @@ export async function exchangeCodeForToken(input: {
   });
 
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text().catch(() => "");
     throw new Error(`Token exchange failed: ${res.status} ${text}`);
   }
 
@@ -63,7 +71,12 @@ async function opFetch<T>(path: string, accessToken: string): Promise<T> {
   });
 
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text().catch(() => "");
+    if (res.status === 401) {
+      throw new OpenProjectUnauthenticatedError(
+        `OpenProject API unauthenticated (401): ${text || "no body"}`
+      );
+    }
     throw new Error(`OpenProject API error ${res.status}: ${text}`);
   }
 
@@ -83,4 +96,9 @@ export async function getWorkPackages(accessToken: string, pageSize = 100) {
 
 export async function getWorkPackageById(accessToken: string, id: number) {
   return opFetch<OpenProjectWorkPackage>(`/api/v3/work_packages/${id}`, accessToken);
+}
+
+// 👇 Potřebné pro edit Drawer (allowedValues / schema)
+export async function getWorkPackageForm(accessToken: string, id: number) {
+  return opFetch<any>(`/api/v3/work_packages/${id}/form`, accessToken);
 }
