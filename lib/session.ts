@@ -11,16 +11,26 @@ type SessionPayload = {
 type LoginStatePayload = {
   state: string;
   pkceVerifier: string;
-  returnTo?: string; // ✅ NOVÉ
+  returnTo?: string;
 };
 
 const enc = new TextEncoder();
 const key = enc.encode(env.sessionSecret);
 
-const SESSION_COOKIE = "opkanban_session";
-const LOGIN_STATE_COOKIE = "opkanban_login";
+export const SESSION_COOKIE = "opkanban_session";
+export const LOGIN_STATE_COOKIE = "opkanban_login";
 
 const isProd = process.env.NODE_ENV === "production";
+
+export function cookieOptions(maxAgeSec: number) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: isProd,
+    path: "/",
+    maxAge: maxAgeSec,
+  };
+}
 
 async function sign(payload: JWTPayload, maxAgeSec: number) {
   return new SignJWT(payload)
@@ -39,56 +49,24 @@ async function verify<T>(token: string): Promise<T | null> {
   }
 }
 
-export async function setSession(payload: SessionPayload) {
-  const token = await sign(payload, 60 * 60 * 8);
-  (await cookies()).set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: isProd, // localhost=false, prod=true
-    path: "/",
-    maxAge: 60 * 60 * 8,
-  });
+// ✅ token helpers (pro route handlers, které nastavují cookies přes NextResponse)
+export async function createSessionToken(payload: SessionPayload) {
+  return sign(payload, 60 * 60 * 8);
 }
 
+export async function createLoginStateToken(payload: LoginStatePayload) {
+  return sign(payload, 60 * 10);
+}
+
+// ✅ read-only helpers (OK i v server components)
 export async function getSession(): Promise<SessionPayload | null> {
   const c = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!c) return null;
   return verify<SessionPayload>(c);
 }
 
-export async function clearSession() {
-  (await cookies()).set(SESSION_COOKIE, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: isProd,
-    path: "/",
-    maxAge: 0,
-  });
-}
-
-export async function setLoginState(payload: LoginStatePayload) {
-  const token = await sign(payload, 60 * 10);
-  (await cookies()).set(LOGIN_STATE_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: isProd,
-    path: "/",
-    maxAge: 60 * 10,
-  });
-}
-
 export async function getLoginState(): Promise<LoginStatePayload | null> {
   const c = (await cookies()).get(LOGIN_STATE_COOKIE)?.value;
   if (!c) return null;
   return verify<LoginStatePayload>(c);
-}
-
-export async function clearLoginState() {
-  (await cookies()).set(LOGIN_STATE_COOKIE, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: isProd,
-    path: "/",
-    maxAge: 0,
-  });
 }

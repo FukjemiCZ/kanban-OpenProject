@@ -3,6 +3,7 @@
 import { Card, CardActionArea, CardContent, Chip, Stack, Typography } from "@mui/material";
 import type { CardFieldKey, DragCardPayload, WorkPackage } from "./kanban.types";
 import { normalizeValue } from "./kanban.utils";
+import { hexToRgba } from "@/lib/color";
 
 export function KanbanCard({
   card,
@@ -28,6 +29,8 @@ export function KanbanCard({
     responsibleName: "Responsible",
   };
 
+  const bg = card.statusColor ? hexToRgba(card.statusColor, 0.3) : undefined;
+
   return (
     <Card
       variant="outlined"
@@ -42,6 +45,27 @@ export function KanbanCard({
         minWidth: 0,
         cursor: draggable ? "grab" : "pointer",
         "&:active": { cursor: draggable ? "grabbing" : "pointer" },
+
+        // ✅ background based on status color (70% transparent => alpha 0.30)
+        backgroundColor: bg,
+
+        // ✅ optional left stripe (full color) for better scanability
+        position: "relative",
+        ...(card.statusColor
+          ? {
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: 6,
+                backgroundColor: card.statusColor,
+                borderTopLeftRadius: 4,
+                borderBottomLeftRadius: 4,
+              },
+            }
+          : null),
       }}
     >
       <CardActionArea onClick={() => onOpen(card.id)}>

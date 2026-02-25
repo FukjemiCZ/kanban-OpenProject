@@ -34,6 +34,8 @@ export type WorkPackage = {
 
   responsibleName?: string;
   responsibleHref?: string | null;
+  
+  statusColor?: string | null;
 };
 
 export type Me = { name: string };

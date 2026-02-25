@@ -18,10 +18,11 @@ import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import { useEffect, useMemo, useState } from "react";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 
 type Detail = {
   id: number;
-  lockVersion?: number; // IMPORTANT: musí přijít z API pro PATCH
+  lockVersion?: number; // musí přijít z API pro PATCH
   subject: string;
   description?: {
     raw?: string;
@@ -51,8 +52,6 @@ function formatDate(v?: string | null) {
 }
 
 function toDateInputValue(v?: string | null) {
-  // API typicky vrací YYYY-MM-DD, což je OK pro input[type=date].
-  // Kdyby přišlo ISO s časem, vezmeme první část.
   if (!v) return "";
   const s = String(v);
   return s.includes("T") ? s.split("T")[0] : s;
@@ -63,8 +62,7 @@ function parsePercent(v: string): number | null {
   if (!s) return null;
   const n = Number(s);
   if (!Number.isFinite(n)) return null;
-  const clamped = Math.max(0, Math.min(100, Math.round(n)));
-  return clamped;
+  return Math.max(0, Math.min(100, Math.round(n)));
 }
 
 export function WorkPackageDetailDrawer({
@@ -110,7 +108,6 @@ export function WorkPackageDetailDrawer({
     try {
       const res = await fetch(`/api/work-packages/${id}`, { cache: "no-store" });
       const data = await res.json();
-
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
 
       setDetail(data);
@@ -161,16 +158,12 @@ export function WorkPackageDetailDrawer({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workPackageId]);
 
   const opHref = useMemo(() => {
     const href = detail?._links?.self?.href;
-    if (!href) return null;
-    return href;
+    return href || null;
   }, [detail]);
-
-  const rawDescription = detail?.description?.raw?.trim();
 
   const canEdit = Boolean(detail?.id);
 
@@ -189,7 +182,6 @@ export function WorkPackageDetailDrawer({
     setError(null);
 
     try {
-      // payload jen s tím, co měníme (a lockVersion vždy)
       const payload: any = { lockVersion };
 
       const prevSubject = detail.subject ?? "";
@@ -223,11 +215,8 @@ export function WorkPackageDetailDrawer({
       });
 
       const data = await res.json().catch(() => ({} as any));
-      if (!res.ok) {
-        throw new Error(data?.error || `HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
 
-      // Nejrobustnější je reloadnout detail (kvůli lockVersion + server-side normalizaci)
       await loadDetail(detail.id);
       setEditMode(false);
     } catch (e) {
@@ -449,14 +438,18 @@ export function WorkPackageDetailDrawer({
                   multiline
                   minRows={8}
                 />
-              ) : rawDescription ? (
-                <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-                  {rawDescription}
-                </Typography>
               ) : (
-                <Typography variant="body2" color="text.secondary">
-                  Bez popisu
-                </Typography>
+                <>
+                  <MarkdownRenderer
+                    raw={detail.description?.raw ?? null}
+                    html={detail.description?.html ?? null}
+                  />
+                  {!detail.description?.raw?.trim() && !detail.description?.html?.trim() ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Bez popisu
+                    </Typography>
+                  ) : null}
+                </>
               )}
             </Box>
           </Stack>

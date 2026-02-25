@@ -1,33 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generatePkce, randomState } from "@/lib/pkce";
-import { setLoginState } from "@/lib/session";
 import { getAuthorizeUrl } from "@/lib/openproject";
+import {
+  LOGIN_STATE_COOKIE,
+  cookieOptions,
+  createLoginStateToken,
+} from "@/lib/session";
 
 export async function GET(req: NextRequest) {
   const { verifier, challenge } = generatePkce();
   const state = randomState();
 
-  // přijmeme např. /api/auth/login?returnTo=/board?type=Task
   const url = new URL(req.url);
   const returnToParam = url.searchParams.get("returnTo");
-
   const safeReturnTo =
-    returnToParam &&
-    returnToParam.startsWith("/") &&
-    !returnToParam.startsWith("//")
+    returnToParam && returnToParam.startsWith("/") && !returnToParam.startsWith("//")
       ? returnToParam
       : "/board";
 
-  await setLoginState({
+  const token = await createLoginStateToken({
     state,
     pkceVerifier: verifier,
-    returnTo: safeReturnTo, // <-- NOVÉ
+    returnTo: safeReturnTo,
   });
 
-  const authorizeUrl = getAuthorizeUrl({
-    state,
-    codeChallenge: challenge,
-  });
+  const authorizeUrl = getAuthorizeUrl({ state, codeChallenge: challenge });
 
-  return NextResponse.redirect(authorizeUrl);
+  // ✅ nastav cookies přes NextResponse (stabilní v Next 15)
+  const res = NextResponse.redirect(authorizeUrl);
+  res.cookies.set(LOGIN_STATE_COOKIE, token, cookieOptions(60 * 10));
+  return res;
 }
