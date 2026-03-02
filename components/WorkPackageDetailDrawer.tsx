@@ -1,5 +1,10 @@
 "use client";
 
+import CloseIcon from "@mui/icons-material/Close";
+import EditIcon from "@mui/icons-material/Edit";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import SaveIcon from "@mui/icons-material/Save";
+import CancelIcon from "@mui/icons-material/Cancel";
 import {
   Box,
   Button,
@@ -12,23 +17,14 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import EditIcon from "@mui/icons-material/Edit";
-import SaveIcon from "@mui/icons-material/Save";
-import CancelIcon from "@mui/icons-material/Cancel";
 import { useEffect, useMemo, useState } from "react";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 
 type Detail = {
   id: number;
-  lockVersion?: number; // musí přijít z API pro PATCH
+  lockVersion?: number;
   subject: string;
-  description?: {
-    raw?: string;
-    html?: string;
-    format?: string;
-  } | null;
+  description?: { raw?: string; html?: string; format?: string } | null;
   startDate?: string | null;
   dueDate?: string | null;
   percentageDone?: number | null;
@@ -84,9 +80,9 @@ export function WorkPackageDetailDrawer({
   // edit state
   const [subject, setSubject] = useState("");
   const [descriptionRaw, setDescriptionRaw] = useState("");
-  const [startDate, setStartDate] = useState<string>("");
-  const [dueDate, setDueDate] = useState<string>("");
-  const [percentageDone, setPercentageDone] = useState<string>("");
+  const [startDate, setStartDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [percentageDone, setPercentageDone] = useState("");
 
   function resetFormFromDetail(d: Detail | null) {
     setSubject(d?.subject ?? "");
@@ -109,7 +105,6 @@ export function WorkPackageDetailDrawer({
       const res = await fetch(`/api/work-packages/${id}`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-
       setDetail(data);
       resetFormFromDetail(data);
     } catch (e) {
@@ -124,47 +119,33 @@ export function WorkPackageDetailDrawer({
 
     let cancelled = false;
 
-    async function run() {
+    (async () => {
       setLoading(true);
       setError(null);
       setDetail(null);
       setEditMode(false);
 
       try {
-        const res = await fetch(`/api/work-packages/${workPackageId}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(`/api/work-packages/${workPackageId}`, { cache: "no-store" });
         const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data?.error || `HTTP ${res.status}`);
-        }
-
+        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
         if (!cancelled) {
           setDetail(data);
           resetFormFromDetail(data);
         }
       } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Unknown error");
-        }
+        if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }
-
-    run();
+    })();
 
     return () => {
       cancelled = true;
     };
   }, [open, workPackageId]);
 
-  const opHref = useMemo(() => {
-    const href = detail?._links?.self?.href;
-    return href || null;
-  }, [detail]);
-
+  const opHref = useMemo(() => detail?._links?.self?.href ?? null, [detail]);
   const canEdit = Boolean(detail?.id);
 
   async function onSave() {
@@ -173,7 +154,7 @@ export function WorkPackageDetailDrawer({
     const lockVersion = detail.lockVersion;
     if (typeof lockVersion !== "number") {
       setError(
-        "Chybí lockVersion v detailu work package. Uprav /api/work-packages/:id aby vracel lockVersion (OpenProject ho vyžaduje pro PATCH)."
+        "Chybí lockVersion v detailu work package.\nUprav /api/work-packages/:id aby vracel lockVersion (OpenProject ho vyžaduje pro PATCH)."
       );
       return;
     }
@@ -241,10 +222,11 @@ export function WorkPackageDetailDrawer({
         },
       }}
     >
+      {/* Header */}
       <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
-        <Stack direction="row" spacing={1} alignItems="flex-start">
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="body2" color="text.secondary">
+        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="overline" color="text.secondary">
               Work package {workPackageId ? `#${workPackageId}` : ""}
             </Typography>
 
@@ -258,49 +240,51 @@ export function WorkPackageDetailDrawer({
                 sx={{ mt: 1 }}
               />
             ) : (
-              <Typography variant="h6" sx={{ mt: 0.5 }}>
+              <Typography variant="h6" sx={{ wordBreak: "break-word" }}>
                 {detail?.subject || "Detail work package"}
               </Typography>
             )}
           </Box>
 
-          {opHref ? (
-            <IconButton
-              component="a"
-              href={opHref}
-              target="_blank"
-              rel="noreferrer"
-              title="Open in OpenProject"
-            >
-              <OpenInNewIcon />
-            </IconButton>
-          ) : null}
+          <Stack direction="row" alignItems="center" gap={0.5}>
+            {opHref ? (
+              <IconButton
+                size="small"
+                title="Otevřít v OpenProject"
+                onClick={() => window.open(opHref, "_blank", "noreferrer")}
+              >
+                <OpenInNewIcon fontSize="small" />
+              </IconButton>
+            ) : null}
 
-          {canEdit && !editMode ? (
+            {canEdit && !editMode ? (
+              <IconButton
+                size="small"
+                title="Upravit"
+                onClick={() => {
+                  resetFormFromDetail(detail);
+                  setEditMode(true);
+                }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            ) : null}
+
             <IconButton
+              size="small"
+              title="Zavřít"
               onClick={() => {
-                resetFormFromDetail(detail);
-                setEditMode(true);
+                setEditMode(false);
+                onClose();
               }}
-              title="Upravit"
             >
-              <EditIcon />
+              <CloseIcon fontSize="small" />
             </IconButton>
-          ) : null}
-
-          <IconButton
-            onClick={() => {
-              setEditMode(false);
-              onClose();
-            }}
-            title="Zavřít"
-          >
-            <CloseIcon />
-          </IconButton>
+          </Stack>
         </Stack>
 
         {editMode ? (
-          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} justifyContent="flex-end">
+          <Stack direction="row" gap={1} sx={{ mt: 2 }}>
             <Button
               variant="outlined"
               startIcon={<CancelIcon />}
@@ -312,91 +296,73 @@ export function WorkPackageDetailDrawer({
             >
               Cancel
             </Button>
-            <Button
-              variant="contained"
-              startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
-              disabled={saving}
-              onClick={onSave}
-            >
+            <Button variant="contained" startIcon={<SaveIcon />} disabled={saving} onClick={onSave}>
               Save
             </Button>
           </Stack>
         ) : null}
       </Box>
 
-      <Box sx={{ p: 2, overflowY: "auto" }}>
+      {/* Body */}
+      <Box sx={{ p: 2 }}>
         {loading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+          <Stack alignItems="center" sx={{ py: 6 }}>
             <CircularProgress />
-          </Box>
+          </Stack>
         ) : error ? (
-          <Typography color="error">{error}</Typography>
+          <Typography color="error" sx={{ whiteSpace: "pre-wrap" }}>
+            {error}
+          </Typography>
         ) : !detail ? (
           <Typography color="text.secondary">Žádná data</Typography>
         ) : (
-          <Stack spacing={2}>
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              {detail._links?.status?.title ? (
-                <Chip label={`Status: ${detail._links.status.title}`} />
-              ) : null}
-              {detail._links?.type?.title ? (
-                <Chip variant="outlined" label={`Typ: ${detail._links.type.title}`} />
-              ) : null}
-              {detail._links?.priority?.title ? (
-                <Chip variant="outlined" label={`Priorita: ${detail._links.priority.title}`} />
-              ) : null}
+          <Stack gap={2}>
+            <Stack direction="row" gap={1} flexWrap="wrap">
+              {detail._links?.status?.title ? <Chip label={detail._links.status.title} /> : null}
+              {detail._links?.type?.title ? <Chip label={detail._links.type.title} /> : null}
+              {detail._links?.priority?.title ? <Chip label={detail._links.priority.title} /> : null}
             </Stack>
 
+            <Divider />
+
             <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                Kontext
+              <Typography variant="subtitle2">Kontext</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Projekt: {detail._links?.project?.title || "—"}
+                <br />
+                Assignee: {detail._links?.assignee?.title || "—"}
+                <br />
+                Author: {detail._links?.author?.title || "—"}
+                <br />
+                Responsible: {detail._links?.responsible?.title || "—"}
               </Typography>
-              <Stack spacing={0.75}>
-                <Typography variant="body2">
-                  <strong>Projekt:</strong> {detail._links?.project?.title || "—"}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Assignee:</strong> {detail._links?.assignee?.title || "—"}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Author:</strong> {detail._links?.author?.title || "—"}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Responsible:</strong> {detail._links?.responsible?.title || "—"}
-                </Typography>
-              </Stack>
             </Box>
 
             <Divider />
 
             <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                Termíny a postup
-              </Typography>
+              <Typography variant="subtitle2">Termíny a postup</Typography>
 
               {editMode ? (
-                <Stack spacing={1.25}>
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
-                    <TextField
-                      label="Start"
-                      type="date"
-                      InputLabelProps={{ shrink: true }}
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      fullWidth
-                    />
-                    <TextField
-                      label="Due"
-                      type="date"
-                      InputLabelProps={{ shrink: true }}
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
-                      fullWidth
-                    />
-                  </Stack>
-
+                <Stack gap={1} sx={{ mt: 1 }}>
                   <TextField
-                    label="Hotovo (%)"
+                    label="Start date"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Due date"
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Percentage done"
                     value={percentageDone}
                     onChange={(e) => setPercentageDone(e.target.value)}
                     inputProps={{ inputMode: "numeric" }}
@@ -405,51 +371,38 @@ export function WorkPackageDetailDrawer({
                   />
                 </Stack>
               ) : (
-                <Stack spacing={0.75}>
-                  <Typography variant="body2">
-                    <strong>Start:</strong> {formatDate(detail.startDate)}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Due:</strong> {formatDate(detail.dueDate)}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Hotovo:</strong>{" "}
-                    {typeof detail.percentageDone === "number"
-                      ? `${detail.percentageDone}%`
-                      : "—"}
-                  </Typography>
-                </Stack>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Start: {formatDate(detail.startDate)}
+                  <br />
+                  Due: {formatDate(detail.dueDate)}
+                  <br />
+                  Hotovo:{" "}
+                  {typeof detail.percentageDone === "number" ? `${detail.percentageDone}%` : "—"}
+                </Typography>
               )}
             </Box>
 
             <Divider />
 
             <Box>
-              <Typography variant="subtitle2" gutterBottom>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
                 Popis
               </Typography>
 
               {editMode ? (
                 <TextField
-                  label="Description (Markdown)"
                   value={descriptionRaw}
                   onChange={(e) => setDescriptionRaw(e.target.value)}
                   fullWidth
                   multiline
                   minRows={8}
                 />
+              ) : !detail.description?.raw?.trim() && !detail.description?.html?.trim() ? (
+                <Typography variant="body2" color="text.secondary">
+                  Bez popisu
+                </Typography>
               ) : (
-                <>
-                  <MarkdownRenderer
-                    raw={detail.description?.raw ?? null}
-                    html={detail.description?.html ?? null}
-                  />
-                  {!detail.description?.raw?.trim() && !detail.description?.html?.trim() ? (
-                    <Typography variant="body2" color="text.secondary">
-                      Bez popisu
-                    </Typography>
-                  ) : null}
-                </>
+                <MarkdownRenderer raw={detail.description?.raw ?? null} html={detail.description?.html ?? null} />
               )}
             </Box>
           </Stack>

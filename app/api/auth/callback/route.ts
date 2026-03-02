@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCodeForToken } from "@/lib/openproject";
 import {
-  LOGIN_STATE_COOKIE,
-  SESSION_COOKIE,
   cookieOptions,
   createSessionToken,
   getLoginState,
+  LOGIN_STATE_COOKIE,
+  SESSION_COOKIE,
 } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
@@ -22,10 +22,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid state" }, { status: 400 });
   }
 
-  const token = await exchangeCodeForToken({
-    code,
-    codeVerifier: loginState.pkceVerifier,
-  });
+  const token = await exchangeCodeForToken({ code, codeVerifier: loginState.pkceVerifier });
 
   const sessionToken = await createSessionToken({
     accessToken: token.access_token,
@@ -38,13 +35,12 @@ export async function GET(req: NextRequest) {
       ? loginState.returnTo
       : "/board";
 
-  const res = NextResponse.redirect(new URL(returnTo, req.url));
+  const res = NextResponse.redirect(new URL(returnTo, req.url), { status: 302 });
+  res.headers.set("Cache-Control", "no-store");
 
-  // ✅ nastav session cookie
   res.cookies.set(SESSION_COOKIE, sessionToken, cookieOptions(60 * 60 * 8));
-
-  // ✅ smaž login-state cookie
-  res.cookies.set(LOGIN_STATE_COOKIE, "", cookieOptions(0));
+  // smaž login state cookie
+  res.cookies.set(LOGIN_STATE_COOKIE, "", { ...cookieOptions(0), maxAge: 0 });
 
   return res;
 }
