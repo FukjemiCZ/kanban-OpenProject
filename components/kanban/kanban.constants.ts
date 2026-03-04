@@ -33,19 +33,21 @@ export const BOARD_COLUMNS: BoardColumnDef[] = [
   {
     key: "new",
     label: "New",
-    aliases: ["new", "New", "novy", "nový", "to do", "Nové", "todo", "open"],
+    aliases: ["new", "novy", "nový", "todo", "to do", "open"],
     isDefault: true,
+    ui: "drawer",
   },
   {
     key: "backlog",
     label: "Backlog",
-    aliases: ["backlog", "Backlog"],
+    aliases: ["backlog"],
     isDefault: true,
+    ui: "drawer",
   },
   {
     key: "ready",
     label: "Ready",
-    aliases: ["ready", "Ready"],
+    aliases: ["ready"],
     isDefault: true,
   },
   {
@@ -56,21 +58,10 @@ export const BOARD_COLUMNS: BoardColumnDef[] = [
   },
   {
     key: "blocker",
-    label: "Blocker",
-    aliases: ["blocker", "blocked", "on hold", "hold", "blokovano","pozastaven", "blokováno"],
+    label: "Blocked",
+    aliases: ["blocked", "blocker", "on hold", "hold", "blokováno", "blokovano"],
     isDefault: true,
-  },
-  {
-    key: "done",
-    label: "Done",
-    aliases: ["Done", "done", "closed", "resolved", "complete", "completed", "Uzavřený", "uzavřen", "hotovo"],
-    isDefault: true,
-  },
-  {
-    key: "rejected",
-    label: "Rejected",
-    aliases: ["Rejected", "rejected"],
-    isDefault: true,
+    ui: "drawer",
   },
   {
     key: "review",
@@ -81,7 +72,7 @@ export const BOARD_COLUMNS: BoardColumnDef[] = [
   {
     key: "qa",
     label: "QA",
-    aliases: ["qa", "test", "testing", "ready for test", "in test"],
+    aliases: ["qa", "test", "testing", "in test", "ready for test"],
     isDefault: false,
   },
   {
@@ -89,6 +80,18 @@ export const BOARD_COLUMNS: BoardColumnDef[] = [
     label: "Waiting Customer",
     aliases: ["waiting customer", "customer feedback", "waiting for customer", "pending customer"],
     isDefault: false,
+  },
+  {
+    key: "done",
+    label: "Done",
+    aliases: ["done", "closed", "resolved", "complete", "completed", "hotovo", "uzavřen", "uzavren"],
+    isDefault: true,
+  },
+  {
+    key: "rejected",
+    label: "Rejected",
+    aliases: ["rejected"],
+    isDefault: true,
   },
   {
     key: "other",
@@ -101,7 +104,28 @@ export const BOARD_COLUMNS: BoardColumnDef[] = [
 export const DEFAULT_COLUMN_KEYS = BOARD_COLUMNS.filter((c) => c.isDefault).map((c) => c.key);
 export const OPTIONAL_COLUMN_KEYS = BOARD_COLUMNS.filter((c) => !c.isDefault).map((c) => c.key);
 
-// fixed widths (stable layout)
+export const DRAWER_COLUMN_KEYS = BOARD_COLUMNS.filter((c) => c.ui === "drawer").map((c) => c.key);
+
+// Layout
 export const COLUMN_WIDTH = 320;
 export const LANE_WIDTH = 240;
 export const NESTED_LANE_WIDTH = 220;
+
+/**
+ * Skutečná šířka panelu (drawer zleva).
+ */
+export const POOL_DRAWER_WIDTH = {
+  xs: "88vw",
+  sm: 420,
+} as const;
+
+/**
+ * Kolik “rezervovat” v layoutu (dock spacer) aby drawer NEPŘEKRÝVAL první sloupec.
+ * Na mobilu nedockujeme (0), na sm+ dockujeme 420px.
+ */
+export const POOL_DRAWER_DOCK_WIDTH = {
+  xs: 0,
+  sm: 420,
+} as const;
+
+export const POOL_DRAWER_TRANSITION = "width 220ms cubic-bezier(0.4, 0, 0.2, 1)";

@@ -10,7 +10,6 @@ export type GroupField =
 export type WorkPackage = {
   id: number;
   subject: string;
-
   lockVersion?: number;
 
   statusName: string;
@@ -34,20 +33,24 @@ export type WorkPackage = {
 
   responsibleName?: string;
   responsibleHref?: string | null;
-  
+
   statusColor?: string | null;
 };
 
 export type Me = { name: string };
 
 export type FiltersState = {
-  q: string; // local-only, not in URL
+  q: string; // local-only
+
   statusName: string[];
   priorityName: string[];
+
   assigneeName: string[];
   projectName: string[];
+
   typeName: string[];
   authorName: string[];
+
   responsibleName: string[];
 };
 
@@ -85,18 +88,29 @@ export type LaneRow = {
   total: number;
 };
 
+export type BoardColumnUiMode = "grid" | "drawer";
+
 export type BoardColumnDef = {
   key: BoardColumnKey;
   label: string;
   aliases: string[];
   isDefault: boolean;
+
+  /**
+   * UI prezentace sloupce:
+   * - "grid"   => normální sloupec v KanbanGrid
+   * - "drawer" => sloupec se NEZOBRAZÍ v gridu, ale jako levý "pool"
+   */
+  ui?: BoardColumnUiMode;
 };
 
 export type BoardDropTarget = {
   columnKey: BoardColumnKey;
+
   laneKey: string;
   laneLabel: string;
   laneApiValue?: string | null;
+
   nestedKey?: string;
   nestedLabel?: string;
   nestedApiValue?: string | null;
