@@ -63,7 +63,7 @@ export const BOARD_COLUMNS: BoardColumnDef[] = [
   {
     key: "done",
     label: "Done",
-    aliases: ["done", "closed", "resolved", "complete", "completed", "Uzavřený", "uzavřen", "hotovo"],
+    aliases: ["Done", "done", "closed", "resolved", "complete", "completed", "Uzavřený", "uzavřen", "hotovo"],
     isDefault: true,
   },
   {

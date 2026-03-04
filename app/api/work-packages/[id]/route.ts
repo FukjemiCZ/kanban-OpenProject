@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getWorkPackageById } from "@/lib/openproject";
+import { BOARD_COLUMNS } from "@/components/kanban/kanban.constants";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -43,6 +44,99 @@ function parseStatusMapFromEnv(): Record<string, string> | null {
   } catch {
     return null;
   }
+}
+
+type OpenProjectStatus = {
+  name?: string;
+  color?: string;
+  _links?: { self?: { href?: string; title?: string } };
+};
+
+let statusesCache: { ts: number; elements: OpenProjectStatus[] } | null = null;
+const STATUSES_CACHE_TTL_MS = 60_000;
+
+function normalizeStatusForMatch(statusName: string) {
+  return statusName
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getColumnStatusCandidates(columnKey: string): string[] {
+  const col = BOARD_COLUMNS.find((c) => c.key === columnKey);
+  const raw = col ? [col.label, col.key, ...(col.aliases ?? [])] : [columnKey];
+
+  // de-dupe while preserving order
+  const out: string[] = [];
+  for (const s of raw) {
+    if (typeof s !== "string") continue;
+    if (!s.trim()) continue;
+    if (!out.includes(s)) out.push(s);
+  }
+  return out;
+}
+
+async function fetchAllStatuses(accessToken: string): Promise<OpenProjectStatus[]> {
+  const now = Date.now();
+  if (statusesCache && now - statusesCache.ts < STATUSES_CACHE_TTL_MS) return statusesCache.elements;
+
+  const base = process.env.OPENPROJECT_BASE_URL;
+  if (!base) throw new Error("Missing env OPENPROJECT_BASE_URL");
+
+  const res = await fetch(`${base.replace(/\/$/, "")}/api/v3/statuses`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/hal+json",
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    statusesCache = { ts: now, elements: [] };
+    return [];
+  }
+
+  const data = await res.json().catch(() => null);
+  const elements: OpenProjectStatus[] = data?._embedded?.elements ?? [];
+  statusesCache = { ts: now, elements };
+  return elements;
+}
+
+async function resolveStatusHrefFromColumnKey(
+  accessToken: string,
+  columnKey: string
+): Promise<string | null> {
+  // "other" is a catch-all column, not a real status target
+  if (columnKey === "other") return null;
+
+  const candidates = getColumnStatusCandidates(columnKey).map(normalizeStatusForMatch);
+  if (!candidates.length) return null;
+
+  const statuses = await fetchAllStatuses(accessToken);
+
+  // Build map: normalized status name/title -> href
+  const byName = new Map<string, string>();
+  for (const s of statuses) {
+    const href = s?._links?.self?.href;
+    if (!href || typeof href !== "string") continue;
+
+    const n1 = typeof s.name === "string" ? normalizeStatusForMatch(s.name) : "";
+    const n2 =
+      typeof s?._links?.self?.title === "string" ? normalizeStatusForMatch(s._links.self.title) : "";
+
+    if (n1 && !byName.has(n1)) byName.set(n1, href);
+    if (n2 && !byName.has(n2)) byName.set(n2, href);
+  }
+
+  for (const cand of candidates) {
+    const href = byName.get(cand);
+    if (href) return href;
+  }
+
+  return null;
 }
 
 async function opPatch(accessToken: string, id: number, payload: any) {
@@ -90,22 +184,7 @@ async function opPatch(accessToken: string, id: number, payload: any) {
 async function fetchStatusColor(accessToken: string, statusHref: string | null | undefined) {
   if (!statusHref) return null;
 
-  const base = process.env.OPENPROJECT_BASE_URL;
-  if (!base) throw new Error("Missing env OPENPROJECT_BASE_URL");
-
-  const res = await fetch(`${base.replace(/\/$/, "")}/api/v3/statuses`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/hal+json",
-    },
-    cache: "no-store",
-  });
-
-  if (!res.ok) return null;
-
-  const data = await res.json().catch(() => null);
-  const elements: any[] = data?._embedded?.elements ?? [];
-
+  const elements = await fetchAllStatuses(accessToken);
   const hit = elements.find((s) => s?._links?.self?.href === statusHref);
   const color = hit?.color;
   return typeof color === "string" ? color : null;
@@ -221,20 +300,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   if (boardMove?.statusColumnKey && typeof boardMove.statusColumnKey === "string") {
     const key = boardMove.statusColumnKey;
-    const mappedHref = statusMap?.[key];
 
-    if (mappedHref) {
-      ensureLinks();
-      opPayload._links.status = { href: mappedHref };
-    } else {
-      // If FE also sent statusHref, we're fine; otherwise it's unsupported.
-      const alreadyHasStatus =
-        opPayload._links?.status &&
-        Object.prototype.hasOwnProperty.call(opPayload._links.status, "href");
-      if (!alreadyHasStatus) {
+    // If FE already provided statusHref/links.status, do not override it.
+    const alreadyHasStatus =
+      opPayload._links?.status &&
+      Object.prototype.hasOwnProperty.call(opPayload._links.status, "href");
+
+    if (!alreadyHasStatus) {
+      // Priority:
+      // 1) explicit env mapping (KANBAN_STATUS_BY_COLUMN_KEY)
+      // 2) auto-resolve by matching the column's label/aliases against OpenProject statuses
+      const mappedHref =
+        statusMap?.[key] ?? (await resolveStatusHrefFromColumnKey(session.accessToken, key));
+
+      if (mappedHref) {
+        ensureLinks();
+        opPayload._links.status = { href: mappedHref };
+      } else {
         return jsonError(
           400,
-          `Unsupported boardMove.statusColumnKey="${key}". Provide statusHref ("/api/...") or configure KANBAN_STATUS_BY_COLUMN_KEY env JSON.`,
+          `Unsupported boardMove.statusColumnKey="${key}". No matching OpenProject status found. Provide statusHref ("/api/...") or configure KANBAN_STATUS_BY_COLUMN_KEY env JSON.`,
           { key }
         );
       }
