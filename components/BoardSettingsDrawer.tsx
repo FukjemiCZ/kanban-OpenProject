@@ -50,6 +50,9 @@ type CardFieldKey =
 type BoardColumnKey =
   | "new"
   | "in_progress"
+  | "ready"
+  | "rejected"
+  | "backlog"
   | "blocker"
   | "done"
   | "review"

@@ -33,7 +33,19 @@ export const BOARD_COLUMNS: BoardColumnDef[] = [
   {
     key: "new",
     label: "New",
-    aliases: ["new", "novy", "nový", "to do", "Nové", "todo", "open"],
+    aliases: ["new", "New", "novy", "nový", "to do", "Nové", "todo", "open"],
+    isDefault: true,
+  },
+  {
+    key: "backlog",
+    label: "Backlog",
+    aliases: ["backlog", "Backlog"],
+    isDefault: true,
+  },
+  {
+    key: "ready",
+    label: "Ready",
+    aliases: ["ready", "Ready"],
     isDefault: true,
   },
   {
@@ -52,6 +64,12 @@ export const BOARD_COLUMNS: BoardColumnDef[] = [
     key: "done",
     label: "Done",
     aliases: ["done", "closed", "resolved", "complete", "completed", "Uzavřený", "uzavřen", "hotovo"],
+    isDefault: true,
+  },
+  {
+    key: "rejected",
+    label: "Rejected",
+    aliases: ["Rejected", "rejected"],
     isDefault: true,
   },
   {

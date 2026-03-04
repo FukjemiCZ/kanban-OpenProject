@@ -61,6 +61,9 @@ export type CardFieldKey =
 
 export type BoardColumnKey =
   | "new"
+  | "backlog"
+  | "ready"
+  | "rejected"
   | "in_progress"
   | "blocker"
   | "done"
